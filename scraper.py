@@ -14,7 +14,7 @@ base_url = "https://www.onefc.com/athletes/martial-art/muay-thai/page/{}/"
 # Open CSV file
 with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(['Name', 'Wins', 'Losses', 'Finishes'])
+    csv_writer.writerow(['Name', 'Wins', 'Losses', 'Finishes','Country','Age','Team','Height'])
 
     page = 1
     while True:
@@ -84,8 +84,32 @@ with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
             except:
                 finishes = 'N/A'
 
+            try:
+                country = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(3) > div > a').text
+            except:
+                country = 'N/A'
+
+            try:
+                age = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(4) > div').text
+                age = age[:2].strip()
+            except:
+                age = 'N/A'
+            
+            try:
+                team = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(4) > div').text
+            except:
+                team = 'N/A'
+
+            try:
+                height = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(1) > div').text
+                height = height.split('/')[-1].strip()
+
+
+            except:
+                height = 'N/A'
+            
             # Write row into CSV
-            csv_writer.writerow([name, wins, losses, value])
+            csv_writer.writerow([name, wins, losses, value, country, age, team, height])
 
         page += 1  # go to next page
 
