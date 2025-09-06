@@ -45,13 +45,37 @@ with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
                 wins = driver.find_element(By.CLASS_NAME, 'wins').text
                 wins = wins.split("-")[-1].strip()
             except:
-                wins = 'N/A'
+                try:
+                    fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
+                    win_count, ko_count = 0, 0
+
+                    for row in fight_rows:
+                        result = row.text.upper()
+                        if 'WIN' in result:
+                            win_count += 1
+                            if 'KO' in result or 'TKO' in result:
+                                ko_count += 1
+                        
+                    wins,value = win_count, ko_count
+                except:
+                    wins = 'N/A'
 
             try:
                 losses = driver.find_element(By.CLASS_NAME, 'losses').text
                 losses = losses.split("-")[-1].strip()
             except:
-                losses = 'N/A'
+                try:
+                    fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
+                    loss_count = 0
+
+                    for row in fight_rows:
+                        result = row.text.upper()
+                        if 'LOSS' in result:
+                            loss_count += 1
+                        
+                    losses = loss_count
+                except:
+                    losses = 'N/A'
 
             try:
                 value = driver.find_element(By.CSS_SELECTOR,
