@@ -1,0 +1,12 @@
+# Ignore virtual environment
+venv/
+
+# Python cache files
+*.pyc
+__pycache__/
+
+# macOS system files
+.DS_Store
+
+# IDE files (optional)
+.vscode/
