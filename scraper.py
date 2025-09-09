@@ -85,32 +85,53 @@ with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
                 finishes = 'N/A'
 
             try:
-                country = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(3) > div > a').text
-            except:
-                country = 'N/A'
+                attributes = driver.find_element(By.CLASS_NAME, "attributes")
+                attrs = attributes.find_elements(By.CLASS_NAME, "attr")
 
-            try:
-                age = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(4) > div').text
-                age = age[:2].strip()
-            except:
-                age = 'N/A'
-            
-            try:
-                team = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(4) > div').text
-            except:
-                team = 'N/A'
+                # Defaults
+                height, country, age, team = "N/A", "N/A", "N/A", "N/A"
 
-            try:
-                height = driver.find_element(By.CSS_SELECTOR, '#site-main > div.athlete-banner.container.container-fluid-no-padding-to-md.my-md-4 > div > div.data-column.d-flex.align-items-center.col-12.col-lg-8 > div > div.my-4.attributes > div:nth-child(1) > div').text
-                height = height.split('/')[-1].strip()
+                for attr in attrs:
+                    try:
+                        title = attr.find_element(By.TAG_NAME, "h5").text.strip().lower()
+                        value_elem = attr.find_element(By.CLASS_NAME, "value")
+                        raw_value = value_elem.text.strip()
 
+                        #print(f"Found attribute: {title} | Value: {raw_value}")  # debug
 
-            except:
-                height = 'N/A'
-            
-            # Write row into CSV
+                        if title == "height":
+                            if "/" in raw_value and "cm" in raw_value.lower():
+                                height = raw_value.split("/")[-1].replace("CM", "").strip()
+                            else:
+                                height = raw_value
+
+                        elif title == "country":
+                            countries = [c.text.strip() for c in value_elem.find_elements(By.TAG_NAME, "a")]
+                            country = ", ".join(countries) if countries else raw_value
+
+                        elif title == "age":
+                            age = raw_value.replace("Y", "").strip()
+
+                        elif title == "team":
+                            team = raw_value
+
+                    except Exception as inner_e:
+                        print("Error parsing single attribute:", inner_e)
+
+            except Exception as e:
+                print("Error scraping attributes:", e)
+                height, country, age, team = "N/A", "N/A", "N/A", "N/A"
+
+# ⬇️ Now these should have real values, not N/A
             csv_writer.writerow([name, wins, losses, value, country, age, team, height])
 
-        page += 1  # go to next page
+
+           
+
+
+
+           
+
+            page += 1  # go to next page
 
 driver.quit()
