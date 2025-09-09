@@ -14,7 +14,7 @@ base_url = "https://www.onefc.com/athletes/martial-art/muay-thai/page/{}/"
 # Open CSV file
 with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(['Name', 'Wins', 'Losses', 'Finishes'])
+    csv_writer.writerow(['Name', 'Wins', 'Losses', 'Finishes','Country','Age','Team','Height'])
 
     page = 1
     while True:
@@ -84,9 +84,54 @@ with open('fighters.csv', mode='w', newline='', encoding='utf-8') as csv_file:
             except:
                 finishes = 'N/A'
 
-            # Write row into CSV
-            csv_writer.writerow([name, wins, losses, value])
+            try:
+                attributes = driver.find_element(By.CLASS_NAME, "attributes")
+                attrs = attributes.find_elements(By.CLASS_NAME, "attr")
 
-        page += 1  # go to next page
+                # Defaults
+                height, country, age, team = "N/A", "N/A", "N/A", "N/A"
+
+                for attr in attrs:
+                    try:
+                        title = attr.find_element(By.TAG_NAME, "h5").text.strip().lower()
+                        value_elem = attr.find_element(By.CLASS_NAME, "value")
+                        raw_value = value_elem.text.strip()
+
+                        #print(f"Found attribute: {title} | Value: {raw_value}")  # debug
+
+                        if title == "height":
+                            if "/" in raw_value and "cm" in raw_value.lower():
+                                height = raw_value.split("/")[-1].replace("CM", "").strip()
+                            else:
+                                height = raw_value
+
+                        elif title == "country":
+                            countries = [c.text.strip() for c in value_elem.find_elements(By.TAG_NAME, "a")]
+                            country = ", ".join(countries) if countries else raw_value
+
+                        elif title == "age":
+                            age = raw_value.replace("Y", "").strip()
+
+                        elif title == "team":
+                            team = raw_value
+
+                    except Exception as inner_e:
+                        print("Error parsing single attribute:", inner_e)
+
+            except Exception as e:
+                print("Error scraping attributes:", e)
+                height, country, age, team = "N/A", "N/A", "N/A", "N/A"
+
+# ⬇️ Now these should have real values, not N/A
+            csv_writer.writerow([name, wins, losses, value, country, age, team, height])
+
+
+           
+
+
+
+           
+
+            page += 1  # go to next page
 
 driver.quit()
