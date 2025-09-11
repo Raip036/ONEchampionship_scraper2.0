@@ -6,145 +6,102 @@ import time
 import random
 import os
 
-# Set up ChromeDriver service
+# ---------------- ChromeDriver Setup ----------------
 service = Service('/opt/homebrew/bin/chromedriver')
 driver = webdriver.Chrome(service=service)
 
-# Base URL with pagination
+# ---------------- URL & Files ----------------
 base_url = "https://www.onefc.com/athletes/martial-art/muay-thai/page/{}/"
-
 csv_file = "fighters.csv"
 error_file = "errors.log"
 
-# Check if CSV already exists (resume mode)
+# ---------------- Resume Mode ----------------
 existing_names = set()
 if os.path.exists(csv_file):
     with open(csv_file, "r", encoding="utf-8") as f:
         existing_names = {line.split(",")[0] for line in f.readlines()[1:]}  # skip header
 
-# Open CSV file in append mode
+# ---------------- Open CSV ----------------
 with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
     writer = csv.writer(f)
-
-    # Write header only if file was new
     if os.stat(csv_file).st_size == 0:
         writer.writerow(['Name', 'Wins', 'Losses', 'Finishes', 'Country', 'Age', 'Team', 'Height'])
 
     page = 1
     while True:
         driver.get(base_url.format(page))
-        #time.sleep(2)  # let page load
+        
 
         fighter_cards = driver.find_elements(By.CLASS_NAME, 'simple-post-card')
         if not fighter_cards:
-            break  # stop if no more fighters
+            break  # no more fighters
 
-        # collect links from current page
-        fighter_links = [
-            card.find_element(By.TAG_NAME, 'a').get_attribute('href')
-            for card in fighter_cards
-        ]
+        # Collect links from current page
+        fighter_links = [card.find_element(By.TAG_NAME, 'a').get_attribute('href') for card in fighter_cards]
 
-        # scrape each fighter page
+        # ---------------- Scrape each fighter ----------------
         for link in fighter_links:
             try:
                 driver.get(link)
-                #time.sleep(random.uniform(1, 2))  # polite delay
+                
 
+                # Name
                 try:
-                    name = driver.find_element(By.CLASS_NAME, 'use-letter-spacing-hint').text
+                    name = driver.find_element(By.CLASS_NAME, 'use-letter-spacing-hint').text.strip()
                 except:
                     name = 'N/A'
 
-                # Skip if already scraped
                 if name in existing_names:
                     print(f"Skipping already scraped fighter: {name}")
                     continue
 
-                # Wins
-                try:
-                    wins = driver.find_element(By.CLASS_NAME, 'wins').text
-                    wins = wins.split("-")[-1].strip()
-                except:
+                # ---------------- Fight Records ----------------
+                fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
+                win_count, loss_count, ko_count = 0, 0, 0
+
+                for row in fight_rows:
                     try:
-                        fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
-                        win_count, ko_count = 0, 0
-                        for row in fight_rows:
-                            result = row.text.upper()
-                            if 'WIN' in result:
-                                win_count += 1
-                                if 'KO' in result or 'TKO' in result:
-                                    ko_count += 1
-                        wins, value = win_count, ko_count
-                    except:
-                        wins, value = 'N/A', 'N/A'
+                        # Result text (WIN / LOSS)
+                        result_text = row.find_element(By.CLASS_NAME, 'result').text.upper()
 
-                # Losses
-                try:
-                    losses = driver.find_element(By.CLASS_NAME, 'losses').text
-                    losses = losses.split("-")[-1].strip()
-                except:
-                    try:
-                        fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
-                        loss_count = 0
-                        for row in fight_rows:
-                            if 'LOSS' in row.text.upper():
-                                loss_count += 1
-                        losses = loss_count
-                    except:
-                        losses = 'N/A'
+                        if 'WIN' in result_text:
+                            win_count += 1
 
-                # Finishes (KO/TKO etc.)
-                try:
-                    # Try summary box first
-                    finishes = driver.find_element(
-                        By.CSS_SELECTOR,
-                        '#site-main > div:nth-child(3) > div > div > div > div:nth-child(3) > div > div > div.simple-stats-list > div:nth-child(1) > div.value'
-                    ).text
-                    try:
-                        finishes = int(finishes)
-                    except:
-                        pass
-                except Exception:
-                    # fallback: parse the fight history rows
-                    try:
-                        fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
-                        finish_count, ko_count, tko_count = 0, 0, 0
-
-                        for row in fight_rows:
-                            row_text = row.text.upper()
-
-                            if 'WIN' not in row_text:
-                                continue
-
+                            # KO/TKO check with fallback
                             method_text = ""
                             try:
-                                method_elem = row.find_element(By.CSS_SELECTOR, ".is-result-method-and-round .d-sm-none")
-                                method_text = method_elem.text.upper().strip()
+                                # Small-screen responsive span
+                                method_span = row.find_element(By.CSS_SELECTOR,
+                                                               'div.result-method-and-round span.d-sm-none')
+                                method_text = method_span.text.strip().upper()
                             except:
+                                pass
+
+                            if not method_text:
                                 try:
-                                    method_elem = row.find_element(By.CSS_SELECTOR, ".d-sm-none")
-                                    method_text = method_elem.text.upper().strip()
+                                    # Desktop td.method fallback
+                                    method_td = row.find_element(By.CSS_SELECTOR, 'td.method')
+                                    method_text = method_td.text.strip().upper()
                                 except:
-                                    method_text = row_text
+                                    method_text = ""
 
-                            if "TKO" in method_text:
-                                tko_count += 1
-                                finish_count += 1
-                            elif ("KO" in method_text) or ("K.O." in method_text) or ("Knockout" in method_text):
+                            if 'KO' in method_text or 'TKO' in method_text or 'KNOCKOUT' in method_text:
                                 ko_count += 1
-                                finish_count += 1
 
-                        finishes = finish_count
+                        elif 'LOSS' in result_text:
+                            loss_count += 1
+
                     except Exception as e:
-                        print("Error counting finishes from fight history:", e)
-                        finishes = 'N/A'
+                        print("Error parsing fight row:", e)
+                        continue
 
-                # Attributes (Height, Country, Age, Team)
+                wins, losses, finishes = win_count, loss_count, ko_count
+
+                # ---------------- Attributes (Height, Country, Age, Team) ----------------
+                height, country, age, team = "N/A", "N/A", "N/A", "N/A"
                 try:
                     attributes = driver.find_element(By.CLASS_NAME, "attributes")
                     attrs = attributes.find_elements(By.CLASS_NAME, "attr")
-                    height, country, age, team = "N/A", "N/A", "N/A", "N/A"
 
                     for attr in attrs:
                         title = attr.find_element(By.TAG_NAME, "h5").text.strip().lower()
@@ -169,18 +126,17 @@ with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
 
                 except Exception as e:
                     print("Error scraping attributes:", e)
-                    height, country, age, team = "N/A", "N/A", "N/A", "N/A"
 
-                # Write to CSV
+                # ---------------- Write to CSV ----------------
                 writer.writerow([name, wins, losses, finishes, country, age, team, height])
                 existing_names.add(name)
-                print(f"✅ Saved: {name}")
+                print(f"✅ Saved: {name} | Wins: {wins}, Losses: {losses}, Finishes: {finishes}")
 
             except Exception as e:
                 print(f"❌ Failed on {link}: {e}")
                 with open(error_file, "a", encoding="utf-8") as log:
                     log.write(link + "\n")
 
-        page += 1  # go to next page
+        page += 1  # next page
 
 driver.quit()
