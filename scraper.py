@@ -33,7 +33,7 @@ with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
     page = 1
     while True:
         driver.get(base_url.format(page))
-        time.sleep(2)  # let page load
+        #time.sleep(2)  # let page load
 
         fighter_cards = driver.find_elements(By.CLASS_NAME, 'simple-post-card')
         if not fighter_cards:
@@ -49,7 +49,7 @@ with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
         for link in fighter_links:
             try:
                 driver.get(link)
-                time.sleep(random.uniform(1, 2))  # polite delay
+                #time.sleep(random.uniform(1, 2))  # polite delay
 
                 try:
                     name = driver.find_element(By.CLASS_NAME, 'use-letter-spacing-hint').text
@@ -96,13 +96,51 @@ with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
 
                 # Finishes (KO/TKO etc.)
                 try:
-                    value = driver.find_element(By.CSS_SELECTOR,
+                    # Try summary box first
+                    finishes = driver.find_element(
+                        By.CSS_SELECTOR,
                         '#site-main > div:nth-child(3) > div > div > div > div:nth-child(3) > div > div > div.simple-stats-list > div:nth-child(1) > div.value'
                     ).text
-                except:
-                    value = 'N/A'
+                    try:
+                        finishes = int(finishes)
+                    except:
+                        pass
+                except Exception:
+                    # fallback: parse the fight history rows
+                    try:
+                        fight_rows = driver.find_elements(By.CLASS_NAME, 'is-data-row')
+                        finish_count, ko_count, tko_count = 0, 0, 0
 
-                # Attributes (height, country, age, team)
+                        for row in fight_rows:
+                            row_text = row.text.upper()
+
+                            if 'WIN' not in row_text:
+                                continue
+
+                            method_text = ""
+                            try:
+                                method_elem = row.find_element(By.CSS_SELECTOR, ".is-result-method-and-round .d-sm-none")
+                                method_text = method_elem.text.upper().strip()
+                            except:
+                                try:
+                                    method_elem = row.find_element(By.CSS_SELECTOR, ".d-sm-none")
+                                    method_text = method_elem.text.upper().strip()
+                                except:
+                                    method_text = row_text
+
+                            if "TKO" in method_text:
+                                tko_count += 1
+                                finish_count += 1
+                            elif ("KO" in method_text) or ("K.O." in method_text) or ("Knockout" in method_text):
+                                ko_count += 1
+                                finish_count += 1
+
+                        finishes = finish_count
+                    except Exception as e:
+                        print("Error counting finishes from fight history:", e)
+                        finishes = 'N/A'
+
+                # Attributes (Height, Country, Age, Team)
                 try:
                     attributes = driver.find_element(By.CLASS_NAME, "attributes")
                     attrs = attributes.find_elements(By.CLASS_NAME, "attr")
@@ -134,7 +172,7 @@ with open(csv_file, mode='a', newline='', encoding='utf-8') as f:
                     height, country, age, team = "N/A", "N/A", "N/A", "N/A"
 
                 # Write to CSV
-                writer.writerow([name, wins, losses, value, country, age, team, height])
+                writer.writerow([name, wins, losses, finishes, country, age, team, height])
                 existing_names.add(name)
                 print(f"✅ Saved: {name}")
 
